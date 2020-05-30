@@ -400,6 +400,9 @@ doubleP = keywordP "double"
 dropP :: Parser Range
 dropP = keywordP "drop"
 
+createP :: Parser Range
+createP = keywordP "create"
+
 elseP :: Parser Range
 elseP = keywordP "else"
 

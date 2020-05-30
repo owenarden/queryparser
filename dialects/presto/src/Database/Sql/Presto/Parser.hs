@@ -72,6 +72,7 @@ statementParser = do
     emptyStatementP = EmptyStmt <$> Tok.semicolonP  -- but we don't allow eof here. `;` is the
     -- only way to write the empty statement, i.e. `` (empty string) is not allowed.
 
+
 emptyParserScope :: ParserScope
 emptyParserScope = ParserScope
     { selectTableAliases = Nothing }
@@ -126,6 +127,10 @@ statementP = choice
     , GrantStmt <$> grantP
     , RevokeStmt <$> revokeP
     , InsertStmt <$> insertP
+    , do
+          _ <- try $ P.lookAhead createViewPrefixP
+          CreateViewStmt <$> createViewP
+    --, CreateTableStmt <$> createTableP
     ]
 
 queryP :: Parser (Query RawNames Range)
@@ -1435,6 +1440,34 @@ deleteP = do
     pure $ Delete info table maybeExpr
 
 
+createViewPrefixP :: Parser Range
+createViewPrefixP = do
+    s <- Tok.createP
+    e <- Tok.viewP
+    pure $ s <> e
+
+createViewP :: Parser (CreateView RawNames Range)
+createViewP = do
+    s <- createViewPrefixP
+    createViewIfNotExists <- optionMaybe ifNotExistsP
+    createViewName <- tableNameP
+    _ <- Tok.asP
+    createViewQuery <- querySelectP
+    createViewColumns <- return $ Nothing -- XXX: TODO
+    let createViewInfo = s <> getInfo createViewName
+    pure CreateView{..}
+
+--
+--createTableP :: Parser (CreateTable Presto RawNames Range)
+--createTableP = do
+--    s <- Tok.createP
+--    _ <- Tok.tableP
+--    table <- tableNameP
+--
+--    let createTableInfo = s <> getInfo table
+--        createTableNames = table :| []
+--    pure CreateTable{..}
+
 dropViewPrefixP :: Parser Range
 dropViewPrefixP = do
     s <- Tok.dropP
@@ -1462,12 +1495,18 @@ dropTableP = do
         dropTableNames = table :| []
     pure DropTable{..}
 
+ifNotExistsP :: Parser Range
+ifNotExistsP = do
+    s <- Tok.ifP
+    n <- Tok.notP
+    e <- Tok.existsP
+    pure $ s <> n <> e
+
 ifExistsP :: Parser Range
 ifExistsP = do
     s <- Tok.ifP
     e <- Tok.existsP
     pure $ s <> e
-
 
 grantP :: Parser (Grant Range)
 grantP = do
